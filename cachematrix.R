@@ -159,7 +159,7 @@ makeCacheMatrix <- function( x = matrix() ) {
 ##
 ##
 ## Input object(s):
-##      x: 
+##      x: special "matrix" object returned by makeCacheMatrix()
 ##
 ## Return object:
 ##      Inverse of input matrix x
