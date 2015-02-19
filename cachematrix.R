@@ -9,6 +9,15 @@
 ## the first one. It create a matrix using makeCacheMatrix() function and later
 ## on asks for the inverse of the matrix. And also returns the inverse to the
 ## caller.
+##
+## Note: This example is somewhat different from the example given in the
+## course site. In this example, the moment the matrix is modified, its inverse
+## gets calculated instantly. When ever the inverse is asked for at the later
+## stage, it is always returned from the cache. But in the example given in the
+## course site, the moment the value of x is modified, the mean is reset to
+## NULL. And, if the mean is asked after setting the value, it is first
+## calculated and then returned. If the value of x is not changed, mean is
+## returned from the cache.
 ################################################################################
 
 ################################################################################
@@ -53,9 +62,9 @@ makeCacheMatrix <- function( x = matrix() ) {
             return( NULL )
         }
         
-        ## It could have been better if we would add checking of square matrix
-        ## before going for inverse calculation. But, let us at this point
-        ## assume that user will provide a square matrix.
+        ## It could have been better if we would add checking of invertible
+        ## matrix before going for inverse calculation. But, let us at this
+        ## point assume that user will provide a square matrix.
         ## if( nrow( mat ) != ncol( mat ) ) {    # square matrix?
         ##     print( "Set fail: not a square matrix" )
         ##     return( NULL )
@@ -76,7 +85,7 @@ makeCacheMatrix <- function( x = matrix() ) {
     }
     
     # Set individual element of the matrix, automatically re-calculates the
-    # inverse if the element is modified. Returns the new value.
+    # inverse if the element is changed. Returns the new value.
     setElement <- function( row, col, val ) {
         if( is.na( x[row, col] ) || x[row, col] != val ) {
             x[row, col] <<- val
