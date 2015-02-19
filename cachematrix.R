@@ -1,59 +1,92 @@
 ################################################################################
-## Two functons are there namely makeCacheMatrix() and cacheSolve(). These
-## functions show how a computationally expensive vector could be cached for
-## latter exploiting scoping rule of R language. Here, the first function
-## creates a matrix and calculates inverse of it when it is first created and
-## also whenever it is modified. The inverse matrix is cached for later use.
-## Whenever user asks for the inverse of the matrix, it returns the inverse from
-## the cache instead of calculating it again. The second function takes help of
-## the first one. It create a matrix using makeCacheMatrix() function and later
-## on asks for the inverse of the matrix. And also returns the inverse to the
-## caller.
+## Two functions here, namely makeCacheMatrix() and cacheSolve(), demonstrate
+## how we could cache a computationally expensive object for later use
+## exploiting the scoping rules of R proramming language.
 ##
-## Note: This example is somewhat different from the example given in the
-## course site. In this example, the moment the matrix is modified, its inverse
-## gets calculated instantly. When ever the inverse is asked for at the later
-## stage, it is always returned from the cache. But in the example given in the
-## course site, the moment the value of x is modified, the mean is reset to
-## NULL. And, if the mean is asked after setting the value, it is first
-## calculated and then returned. If the value of x is not changed, mean is
-## returned from the cache.
+##
+## Typical usage of these two functions is here:
+## > a <- matrix( c( 11, 67, 13, 14, 45, 16, 17, 18, 19 ), nrow = 3, ncol = 3 )
+## > mat <- makeCacheMatrix( a )
+## > mat$getMatrix()
+##      [,1] [,2] [,3]
+## [1,]   11   14   17
+## [2,]   67   45   18
+## [3,]   13   16   19
+## > cacheSolve( mat )
+## [1] "Calculating inverse of the matrix..."
+##           [,1] [,2]      [,3]
+## [1,] -18.90000 -0.2  17.10000
+## [2,]  34.63333  0.4 -31.36667
+## [3,] -16.23333 -0.2  14.76667
+## > mat$getInverse()
+##           [,1] [,2]      [,3]
+## [1,] -18.90000 -0.2  17.10000
+## [2,]  34.63333  0.4 -31.36667
+## [3,] -16.23333 -0.2  14.76667
+## > cacheSolve( mat )
+## [1] "Retrieving the inverse from the cache..."
+##           [,1] [,2]      [,3]
+## [1,] -18.90000 -0.2  17.10000
+## [2,]  34.63333  0.4 -31.36667
+## [3,] -16.23333 -0.2  14.76667
+## > mat$setElement( 1, 1, 190 )
+## [1] 190
+## > mat$getInverse()
+## NULL
+## > cacheSolve( mat )
+## [1] "Calculating inverse of the matrix..."
+##              [,1]          [,2]        [,3]
+## [1,]  0.005588244  5.913486e-05 -0.00505603
+## [2,] -0.010240186  3.340134e-02 -0.02248110
+## [3,]  0.004799779 -2.816790e-02  0.07502242
+## > mat$setMatrix(matrix(c(2,5,3,9), 2, 2))
+##      [,1] [,2]
+## [1,]    2    3
+## [2,]    5    9
+## > cacheSolve( mat )
+## [1] "Calculating inverse of the matrix..."
+##           [,1]       [,2]
+## [1,]  3.000000 -1.0000000
+## [2,] -1.666667  0.6666667
+## > cacheSolve( mat )
+## [1] "Retrieving the inverse from the cache..."
+##           [,1]       [,2]
+## [1,]  3.000000 -1.0000000
+## [2,] -1.666667  0.6666667
 ################################################################################
 
 ################################################################################
-## This function creates a matrix and its inverse and also defines sub-functions
-## to manipulate on the matrix. Calculates inverse of the matrix when it is
-## first created and when ever the matrix is modified. Caches the inverse matrix
-## in the environment of the function. Returns the cached inverse when
-## getInverse() is called.
-## Exposed functions are as follows:
-##      setMatrix() : Sets the matrix
-##      setElement(): Sets individual elements of the matrix
+## Purpose:
+## Creates a special "matrix" object that can cache its inverse. Returns a list
+## having following functions.
 ##      getMatrix() : returns the matrix
-##      getInverse(): returns the inverse of the matrix
-##
+##      getInverse(): returns the inverse matrix
+##      setMatrix() : sets the matrix
+##      setElement(): sets individual elements of the matrix
+##      setInverse(): sets inverse of the matrix
+## Whenever the matrix is modified, its inverse is reset to NULL. Hence,
+## whenever matrix is modified, user need to set the inverse as well. If the
+## metrix is set an the matrix is identical to the previous matrix, it's
+## inverse is kept as it is.
 ##
 ## Input object(s):
 ##      x: input matrix, an optional parameter
 ##
 ## Return object:
-##      a list all sub-functions exposed to outer world
+##      a list of all functions to manipulate on the matrix and inverse
 ##
 ## Warning:
-##      Please note that this function will not work if a vector other than
-##      a non-singular square matrix is passed as input
+##      Please note that this function will not work as expected if a
+##      non-invertible matrix is given.
 ################################################################################
 makeCacheMatrix <- function( x = matrix() ) {
     
-    # Calculates the inverse, asumes that the input matrix is always a square and
-    # non singular matrix
-    calcInverse <- function() {
-        inverse_x <<- solve( x )
-    }
+    # Initialize inverse with NULL
+    inverse_x <- NULL
     
-    # Sets matrix, checks for valid and square matrix. Automatically
-    # re-calculates the inverse if the new matrix is modified. Returns
-    # NULL if unable to set the matrix, otherwise returns the matrix
+    # Sets matrix, checks for valid matrix. Returns NULL if the input is not a
+    # valid matrix. Returns the same matrix if setMatrix operation succeeds or
+    # the new matrix is identical to the previous one.
     setMatrix <- function( mat ) {
         
         # Validate the input matrix
@@ -65,13 +98,9 @@ makeCacheMatrix <- function( x = matrix() ) {
         ## It could have been better if we would add checking of invertible
         ## matrix before going for inverse calculation. But, let us at this
         ## point assume that user will provide a square matrix.
-        ## if( nrow( mat ) != ncol( mat ) ) {    # square matrix?
-        ##     print( "Set fail: not a square matrix" )
-        ##     return( NULL )
-        ## }
         
-        # Skip if the new matrix is identical with the
-        # previous, ne need to calculate the inverse then
+        # Skip if the new matrix is identical with the previous, if the matix
+        # has not been changed no need to reset the inverse
         if( identical( x, mat ) ) {
             print( "Warning: identical with previous matrix" )
             return( x )
@@ -80,18 +109,18 @@ makeCacheMatrix <- function( x = matrix() ) {
         # Set the matrix
         x <<- mat
         
-        # Calculate inverse and cache in parent environment
-        calcInverse()
+        inverse_x <<- NULL
+        
+        return( x )
     }
     
-    # Set individual element of the matrix, automatically re-calculates the
-    # inverse if the element is changed. Returns the new value.
+    # Sets individual element of the matrix, resets the inverse if the new value
+    # of the element is not equal to the previous value.
     setElement <- function( row, col, val ) {
         if( is.na( x[row, col] ) || x[row, col] != val ) {
             x[row, col] <<- val
             
-            # The matrix has changes. So, re-calculate inverse matrix
-            calcInverse()
+            inverse_x <<- NULL
         }
         
         # Return the value itself
@@ -108,39 +137,48 @@ makeCacheMatrix <- function( x = matrix() ) {
         inverse_x
     }
     
-    # Calculate inverse. Let us assume here that user will provide a valid
-    # non-singular square matrix. So, no need to validate the matrix at this
-    # point
-    calcInverse()
+    # Sets the inverse
+    setInverse <- function( mat ) {
+        inverse_x <<- mat
+    }
     
     # Return the list of all the functions
     list( getMatrix = getMatrix, getInverse = getInverse,
-          setElement = setElement, setMatrix  = setMatrix )
+          setMatrix = setMatrix, setElement = setElement,
+          setInverse = setInverse )
 }
 
 
 ################################################################################
-## This function takes input of a matrix and retuns it's inverse. Assumes that
-## the input matrix is a square and non-singular one.
+## Purpose:
+## Returns the inverse of the special "matrix" object which is created by
+## makeCacheMatrix() function. It first ask for the inverse from the cache. If
+## the cache contains the inverse then returns the inverse from the cache. If
+## the cache does not contain the inverse then calculates the same, set in the
+## cache and retuns to the user.
 ##
 ##
 ## Input object(s):
-##      x: input matrix, a valid non-singular square matrix
+##      x: 
 ##
 ## Return object:
 ##      Inverse of input matrix x
-##
-## Warning:
-##      Please note that this function will not work if a vector other than
-##      a non-singular square matrix is passed as input
 ################################################################################
 cacheSolve <- function( x, ... ) {
     
-    # Create the matrix and calculate the inverse of it and cache the inverse
-    # for latter use. makeCacheMatrix() creates the matrix and automatically
-    # calculates the inverse and cosecuently caches it for later use.
-    matrix <- makeCacheMatrix( x )
+    # Get the inverse matrix
+    inverse <- x$getInverse()
     
-    # Get the inverse of the matrix from the cache and return it
-    matrix$getInverse()
+    # Inverse is not NULL: means we are getting inverse from cache
+    if( !is.null( inverse ) ) {
+        print( "Retrieving the inverse from the cache..." )
+        return( inverse )
+    }
+    
+    # So, inverse is not there in cache, calculate, set in cache and return
+    print( "Calculating inverse of the matrix..." )
+    inverse <- solve( x$getMatrix() )
+    x$setInverse( inverse )
+    
+    return( inverse )
 }
